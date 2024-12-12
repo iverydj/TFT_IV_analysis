@@ -1,4 +1,4 @@
-# Last modified 20241127
+# Last modified 20241211
 # Can analyze 'n' type FET only for now ///// p type and amb not yet #FIXME
 # Only plotting can be done for none-single sweep(double sweep etc...)
 
@@ -25,29 +25,23 @@ import os
 from datetime import datetime
 now = datetime.now().strftime("%H-%M-%S_%Y%m%d")
 current_filename = os.path.basename(__file__)
-directory = f'./result/TransferCurve/{current_filename}_{now}/'
-print('directory:',directory)
-# directory = f'./test/'
-os.makedirs(directory, exist_ok=True)
-with open(__file__, 'r', encoding="utf-8") as src, open(f'{directory}wholecode.py', 'w', encoding="utf-8") as dst:
-    dst.write(src.read())
 
 ############################### user input  #################################
 device_type = 'n'       # 'n' only ///// p type and amb not yet #FIXME
 
 # Only plotting can be done for none-single sweep data
 #######################################################################
-data_file = './TC_example2.xls'
+data_file = './TR_TiAu.xls'
 
 ConditionData = False
 if ConditionData:
     condition_file = './Conditions.xls'
 else:
     # Size of Channel (um)
-    ch_width = 800
-    ch_length = 200
+    ch_width = 5
+    ch_length = 5
     # Thickness of gate insulator (um)
-    gi_thick = 0.1
+    gi_thick = 0.09
 
 # Relative permitivity (3.9 for SiO2)
 gi_eps_r = 3.9
@@ -59,22 +53,23 @@ linear_window_for_vth = 5  # V
 TransferPlot = True  # plot transfer curve  (True or False)
 if TransferPlot:
     ApplyAbsolute = True  # for absolute value of current
+    plot_I_g = False  # plot gate current (True or False)
     
-    mannual_plot = False  # for transfer curve plot (True or False)
+    mannual_plot = True  # for transfer curve plot (True or False)
     if mannual_plot:
-        Vg_min = -20
-        Vg_max = +20
+        Vg_min = -40
+        Vg_max = +40
         Id_min = 1e-12
         Id_max = 1e-3
         figure_size_h = 8
         figure_size_v = 6
 
 
-AnalyzeVth = True  # calculate Vth (True or False) with 3 methods (current, interpolation, log-derivative)
+AnalyzeVth = False  # calculate Vth (True or False) with 3 methods (current, interpolation, log-derivative)
 
-AnalyzeSS = True  # calculate Subthreshold Swing (True or False)
+AnalyzeSS = False  # calculate Subthreshold Swing (True or False)
 
-AnalyzeMobility = True  #  calculate field effect Mobility (True or False) with transconductance
+AnalyzeMobility = False  #  calculate field effect Mobility (True or False) with transconductance
 
 ############################### user input end #################################
 ############################### specified control #################################
@@ -87,6 +82,13 @@ if True:    ###### change only if you know what you are doing ######
     
     RemoveOutliers = True
 ########################################################
+
+directory = f'./result/TransferCurve/{data_file}_{current_filename}_{now}/'
+print('directory:',directory)
+# directory = f'./test/'
+os.makedirs(directory, exist_ok=True)
+with open(__file__, 'r', encoding="utf-8") as src, open(f'{directory}wholecode.py', 'w', encoding="utf-8") as dst:
+    dst.write(src.read())
 
 # data_file = './' + data_file
 
@@ -291,11 +293,13 @@ for i in range(len(data_names)):
             ax1 = plt.gca() 
             ax2 = ax1.twinx()
             if ApplyAbsolute:
-                ax1.plot(V_g, np.abs(I_d), label='Drain Current ($I_d$) - Log Scale', color='blue')
-                ax1.plot(V_g, np.abs(I_g), color='red', linestyle='--', alpha=0.3, label='Gate Current ($I_g$) - Log Scale')
+                ax1.plot(V_g, np.abs(I_d), label=f'Drain Current($I_d$) - Log Scale\nV_d = {V_d}', color='blue')
+                if plot_I_g:
+                    ax1.plot(V_g, np.abs(I_g), color='red', linestyle='--', alpha=0.15, label='Gate Current ($I_g$) - Log Scale')
             else:
-                ax1.plot(V_g, I_d, label='Drain Current ($I_d$) - Log Scale', color='blue')
-                ax1.plot(V_g, I_g, color='red', linestyle='--', alpha=0.3, label='Gate Current ($I_g$) - Log Scale')
+                ax1.plot(V_g, I_d, label=f'Drain Current($I_d$) - Log Scale\nV_d = {V_d}', color='blue')
+                if plot_I_g:
+                    ax1.plot(V_g, I_g, color='red', linestyle='--', alpha=0.15, label='Gate Current ($I_g$) - Log Scale')
             ax1.set_yscale('log')
             ax1.set_xlabel("Gate Voltage ($V_g$) [V]")
             ax1.set_ylabel("Current [A] - Log Scale")
@@ -314,7 +318,7 @@ for i in range(len(data_names)):
                 ax1.set_ylim(min(I_d.min(), I_g.min())*1e-1, max(I_d.max(), I_g.max())*1e+1)
                 ax2.set_ylim(I_d.min(), I_d.max())
             plt.title("Transfer Curve: {}".format(name))
-            plt.savefig(directory + "TransferCurve_{}.png".format(name))
+            plt.savefig(directory + "TransferCurve_{}.png".format(name), transparent=True)
             plt.cla()
             plt.clf()
             plt.close()
