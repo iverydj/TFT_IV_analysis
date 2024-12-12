@@ -150,7 +150,7 @@ for i in range (len(data_names)):
         plt.ylim(Id_min, Id_max)
     plt.tight_layout()
     # plt.show()
-    plt.savefig(directory+f'DrainCurrent_{data_name}.png')
+    plt.savefig(directory+f'OutputCurve_{data_name}.png', transparent=True)
     plt.cla()   # clear the current axes
     plt.clf()   # clear the current figure
     plt.close() # closes the current figure
