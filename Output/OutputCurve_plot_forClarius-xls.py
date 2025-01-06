@@ -24,6 +24,7 @@ current_filename = os.path.basename(__file__)
 data_file = 'OP_ex1.xls'
 
 ApplyAbsolute = True  # for absolute value of current
+ApplyLogScale = True  # for log scale of current
 
 mannual_plot = False  # for transfer curve plot (True or False)
 if mannual_plot:
@@ -132,7 +133,7 @@ for i in range (len(data_names)):
     
     plt.figure(figsize=(figure_size_h if mannual_plot else 8, figure_size_v if mannual_plot else 6))
     for j in range(len(gateVs)):
-        if ApplyAbsolute:
+        if ApplyLogScale:
             drainIs[j][0] = np.abs(drainIs[j][0])
             plt.yscale('log')
         # print('drainIs[j]:',drainIs[j][0])
@@ -148,6 +149,7 @@ for i in range (len(data_names)):
     if mannual_plot:
         plt.xlim(Vd_min, Vd_max)
         plt.ylim(Id_min, Id_max)
+    plt.ylim(bottom=1e-12)
     plt.tight_layout()
     # plt.show()
     plt.savefig(directory+f'OutputCurve_{data_name}.png', transparent=True)

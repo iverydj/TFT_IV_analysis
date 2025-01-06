@@ -55,7 +55,7 @@ if TransferPlot:
     ApplyAbsolute = True  # for absolute value of current
     plot_I_g = False  # plot gate current (True or False)
     
-    mannual_plot = True  # for transfer curve plot (True or False)
+    mannual_plot = False  # for transfer curve plot (True or False)
     if mannual_plot:
         Vg_min = -40
         Vg_max = +40
@@ -551,7 +551,7 @@ for i in range(len(data_names)):
         np.savetxt(directory + 'results.csv', np.array(result_list), delimiter=',', fmt='%s')
         
         if TransferPlot:
-            _transfercurve = np.vstack((np.array([['V_g-TC', name]], dtype=str), np.round(np.array([V_g, I_d], dtype=float),6).T)).T
+            _transfercurve = np.vstack((np.array([['V_g-TC', name]], dtype=str), np.array([V_g, I_d], dtype=float).T)).T
             transfercurve_list.extend(_transfercurve)
             TC_maxlength = max(len(arr) for arr in transfercurve_list)
             transfercurve_save = np.array([np.pad(arr, (0, TC_maxlength - len(arr)), 'constant') for arr in transfercurve_list]).T
