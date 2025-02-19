@@ -1,4 +1,4 @@
-# %%
+
 # Can analyze 'n' type FET only for now ///// p type and amb not yet #FIXME
 # Only plotting can be done for none-single sweep(double sweep etc...)
 
@@ -83,7 +83,7 @@ if True:    ###### change only if you know what you are doing ######
         Denoise_current = False  # NOT recommended # denoise I_d for calculating mobility (True or False)
         differential_roughness = 2
     
-    log_threshold_findSS = 1.9
+    log_threshold_findSS = 1.3
     
     RemoveOutliers = True
 ########################################################
@@ -131,7 +131,6 @@ for i in range(len(data_names)):
 if len(settings_list) != len(data_names):
     raise ValueError('some data missing')
 
-# %%
 drainI_list = []
 # drainV_list = []
 gateI_list = []
@@ -153,13 +152,12 @@ for i in range(len(data_names)):
     gateV_list.append(V_g_i)
     del sheet_i, data_i, I_d_i,I_g_i, V_g_i #, V_d_i
 
-# %%
 transfercurve_list = []
 subthresholdswing_list = []
 mobilityFE_list = []
 mobilitySat_list = []
 error_files_list = []
-result_list = [['name', 'Drain Voltage', 'Vth_current', 'Vth_interpol', 'Vth_logderivative', 'Subthreshold Swing', 'u_FE(max)']]
+result_list = [['name', 'Drain Voltage', 'Vth_current', 'Vth_interpol', 'Vth_logderivative', 'onoff ratio', 'Subthreshold Swing', 'u_FE(max)']]
 
 eps_0 = scipy.constants.epsilon_0
 gi_eps = gi_eps_r *eps_0 *1e-2  # Permitivity of GI (F/cm)
@@ -414,9 +412,17 @@ for i in range(len(data_names)):
         
         if CalculateVth:
             vth_current = np.round(np.interp(drain_current_at_vth, I_d, V_g, left=np.nan, right=np.nan),3)
+            
             window_size = int(linear_window_for_vth / (Vg_step_interpolate if Vg_step_interpolate>0 else (V_g_step if V_g_step else np.diff(V_g).min())))
             # valid_indices = np.where((V_g_fine >= V_g_fine[ss_start]) & (V_g_fine <= V_g_fine[ss_end+ int(3/Vg_step_interpolate if Vg_step_interpolate>0 else (3/V_g_step if V_g_step else 0))]))[0]
-            valid_indices = np.where((V_g_fine >= V_g_fine[ss_start]) & (V_g_fine <= min(V_g_fine[-1], V_g_fine[ss_end] + 3 / (Vg_step_interpolate if Vg_step_interpolate > 0 else (V_g_step if V_g_step else 1)))))[0]
+            if device_type == 'n':
+                #valid_indices = np.where((V_g_fine >= V_g_fine[ss_start]) 
+                #                         & (V_g_fine <= min(V_g_fine[-1], V_g_fine[ss_end] + 3 / (Vg_step_interpolate if Vg_step_interpolate > 0 else (V_g_step if V_g_step else 1)))))[0]
+                valid_indices = np.where((V_g_fine >= V_g_fine[ss_start]) 
+                                        & (V_g_fine <= V_g_fine[ss_end+ int(3/Vg_step_interpolate if Vg_step_interpolate>0 else (3/V_g_step if V_g_step else 0))]))[0]
+            elif device_type == 'p':
+                valid_indices = np.where((V_g_fine <= V_g_fine[ss_end])
+                                        & (V_g_fine >= V_g_fine[ss_start - int(3/Vg_step_interpolate if Vg_step_interpolate>0 else (3/V_g_step if V_g_step else 0))]))[0]
             # valid_indices = np.where((V_g_fine >= V_g_fine[ss_start]) & (V_g_fine <= V_g_fine[ss_end]))[0]
             search_start, search_end = valid_indices[0], valid_indices[-1]# - window_size + 1
             max_corr = 0
@@ -440,11 +446,15 @@ for i in range(len(data_names)):
             
             max_slope_index_fine = np.argmax(d_log_I_d_dV_g_cut)
             vth_logderivative = np.round(V_g_fine_cut[max_slope_index_fine],3)
-            print('\nvth_current(at {}A): {} V\nvth_interpol: {} V\nvth_logderivative: {} V'.format(drain_current_at_vth, vth_current, vth_interpol, vth_logderivative))
+            
+            onoff_ratio = np.max(np.abs(I_d_fine)) / np.min(np.abs(I_d_fine))
+            
+            print('\nvth_current(at {}A): {} V\nvth_interpol: {} V\nvth_logderivative: {} V\nonoff_ratio {}'.format(drain_current_at_vth, vth_current, vth_interpol, vth_logderivative, onoff_ratio))
         else:
             vth_current = np.nan
             vth_interpol = np.nan
             vth_logderivative = np.nan
+            onoff_ratio = np.nan
         
         if CalculateSS:
             SS_values = 1000 / d_log_I_d_dV_g_fine
@@ -460,6 +470,8 @@ for i in range(len(data_names)):
             subthreshold_swing = np.nan
         
         if CalculateMobility:
+            
+            
             
             if Denoise_current:
                 I_d_rough = gaussian_filter1d(I_d_fine, 1)
@@ -617,7 +629,7 @@ for i in range(len(data_names)):
         plt.clf()
         plt.close()
         
-        result_list.append([name, V_d, vth_current, vth_interpol, vth_logderivative, subthreshold_swing, max_mu_linear])
+        result_list.append([name, V_d, vth_current, vth_interpol, vth_logderivative, onoff_ratio, subthreshold_swing, max_mu_linear])
         np.savetxt(directory + 'results.csv', np.array(result_list), delimiter=',', fmt='%s')
         
         if TransferPlot:
@@ -644,5 +656,3 @@ for i in range(len(data_names)):
 
 if len(error_files_list) > 0:
     print('\n\n\n\n******\nerror occured in files:',error_files_list)
-
-
