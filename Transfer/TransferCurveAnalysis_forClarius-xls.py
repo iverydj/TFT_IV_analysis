@@ -661,7 +661,7 @@ for i in range(len(data_names)):
             mobilityFE_save = np.array([np.pad(arr, (0, MF_maxlength - len(arr)), 'constant') for arr in mobilityFE_list]).T
             np.savetxt(directory + 'MobilityFE.csv', mobilityFE_save, delimiter=',', fmt='%s')
         
-        del V_g_fine, I_d_fine, log_I_d_fine, d_log_I_d_dV_g_fine, subthreshold_indices, V_g_linear, I_d_linear, I_d_rough, V_g_rough, g_m, mu_linear, mu_eff, mu_sat, V_g_rough, I_d_rough, spline_gm, diff, outliers, valid_indices, search_start, search_end, best_start, start, end, V_g_window, I_d_window, corr, max_corr, V_g_extrap, I_d_extrap, slope, intercept, V_g_rough, I_d_rough, roughspline, V_g_rough, I_d_rough, threshold, spline_gm, diff, outliers, g_m, V_g_rough, mu_linear, mu_eff, mu_sat, max_mu_linear, idx_sat_reigion
+        del V_g_rough, V_g_fine, I_d_fine, log_I_d_fine, d_log_I_d_dV_g_fine, subthreshold_indices, V_g_linear, I_d_linear, I_d_rough, g_m, mu_linear, mu_eff, mu_sat, spline_gm, diff, outliers, valid_indices, search_start, search_end, best_start, start, end, V_g_window, I_d_window, corr, max_corr, V_g_extrap, I_d_extrap, slope, intercept, roughspline, threshold, max_mu_linear, idx_sat_reigion
     except Exception as e:
         print('Process Error (Unknown):',e)
         error_files_list.append(name)
