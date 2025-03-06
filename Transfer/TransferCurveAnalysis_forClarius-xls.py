@@ -26,8 +26,8 @@ from datetime import datetime
 now = datetime.now().strftime("%H-%M-%S_%Y%m%d")
 current_filename = os.path.basename(__file__)
 directory = f'./result/TransferCurve/{current_filename}_{now}/'
-print('directory:',directory)
 # directory = f'./test/'
+print('directory:',directory)
 os.makedirs(directory, exist_ok=True)
 with open(__file__, 'r', encoding="utf-8") as src, open(f'{directory}wholecode.py', 'w', encoding="utf-8") as dst:
     dst.write(src.read())
@@ -44,17 +44,17 @@ if ConditionData:
     condition_file = 'Conditions.xls'
 else:
     # Size of Channel (um)
-    ch_width = 800
-    ch_length = 200
+    ch_width = 1
+    ch_length = 1
     # Thickness of gate insulator (um)
-    gi_thick = 0.1
+    gi_thick = 0.09
 
 # Relative permitivity (3.9 for SiO2)
 gi_eps_r = 3.9
 
 drain_current_at_vth = 1e-8 # A
 
-linear_window_for_vth = 10  # V
+linear_window_for_vth = 15  # V
 
 TransferPlot = True  # plot transfer curve  (True or False)
 if TransferPlot:
@@ -83,7 +83,7 @@ if True:    ###### change only if you know what you are doing ######
         Denoise_current = False  # NOT recommended # denoise I_d for calculating mobility (True or False)
         differential_roughness = 2
     
-    log_threshold_findSS = 1.3
+    log_threshold_findSS = 1.8
     
     RemoveOutliers = True
 ########################################################
@@ -163,6 +163,9 @@ eps_0 = scipy.constants.epsilon_0
 gi_eps = gi_eps_r *eps_0 *1e-2  # Permitivity of GI (F/cm)
 for i in range(len(data_names)):
     print('\n\n**** ==== **** ==== ****\nProcessing data:',data_names[i])
+    
+    
+    
     try :
         CalculateVth = AnalyzeVth
         CalculateSS = AnalyzeSS
@@ -381,6 +384,11 @@ for i in range(len(data_names)):
             elif device_type == 'p':
                 subthreshold_indices = np.where(np.log10(d_log_I_d_dV_g_fine +1e-9) >= (log_threshold_findSS)*-1)[0]
             
+            if len(subthreshold_indices) == 0:
+                error_files_list.append(name+' (subthreshold_indices = 0)')
+                print('subthreshold_indices = 0\nenlarge - "log_threshold_findSS"')
+                continue
+            
             # def plot_d_log_I_d(V_g_fine, d_log_I_d_dV_g_fine):
             #     plt.figure(figsize=(8, 5))
             #     plt.plot(V_g_fine, d_log_I_d_dV_g_fine, marker='o', linestyle='-', color='b', label='d_log(I_d) / dV_g')
@@ -423,6 +431,10 @@ for i in range(len(data_names)):
             elif device_type == 'p':
                 valid_indices = np.where((V_g_fine <= V_g_fine[ss_end])
                                         & (V_g_fine >= V_g_fine[ss_start - int(3/Vg_step_interpolate if Vg_step_interpolate>0 else (3/V_g_step if V_g_step else 0))]))[0]
+            if len(valid_indices) == 0:
+                error_files_list.append(name+' (may be 1. too large "log_threshold_findSS" // 2. failed FET)')
+                print('may be 1. too large "log_threshold_findSS" // 2. failed FET')
+                continue
             # valid_indices = np.where((V_g_fine >= V_g_fine[ss_start]) & (V_g_fine <= V_g_fine[ss_end]))[0]
             search_start, search_end = valid_indices[0], valid_indices[-1]# - window_size + 1
             max_corr = 0
@@ -470,8 +482,6 @@ for i in range(len(data_names)):
             subthreshold_swing = np.nan
         
         if CalculateMobility:
-            
-            
             
             if Denoise_current:
                 I_d_rough = gaussian_filter1d(I_d_fine, 1)
@@ -650,6 +660,8 @@ for i in range(len(data_names)):
             MF_maxlength = max(len(arr) for arr in mobilityFE_list)
             mobilityFE_save = np.array([np.pad(arr, (0, MF_maxlength - len(arr)), 'constant') for arr in mobilityFE_list]).T
             np.savetxt(directory + 'MobilityFE.csv', mobilityFE_save, delimiter=',', fmt='%s')
+        
+        del V_g_fine, I_d_fine, log_I_d_fine, d_log_I_d_dV_g_fine, subthreshold_indices, V_g_linear, I_d_linear, I_d_rough, V_g_rough, g_m, mu_linear, mu_eff, mu_sat, V_g_rough, I_d_rough, spline_gm, diff, outliers, valid_indices, search_start, search_end, best_start, start, end, V_g_window, I_d_window, corr, max_corr, V_g_extrap, I_d_extrap, slope, intercept, V_g_rough, I_d_rough, roughspline, V_g_rough, I_d_rough, threshold, spline_gm, diff, outliers, g_m, V_g_rough, mu_linear, mu_eff, mu_sat, max_mu_linear, idx_sat_reigion
     except Exception as e:
         print('Process Error (Unknown):',e)
         error_files_list.append(name)
