@@ -1,6 +1,6 @@
-# TFT_IV_analysis
+# FET_IV_analysis
 for electric measurements
 
-last update: 20241211  // Yi, Dong-Joon
+last update: 20250306  // Yi, Dong-Joon
 
-use xls sheets directly saved from clarius(4200)
+use xls sheets directly saved from clarius(4200a-scs)
