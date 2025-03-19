@@ -1,12 +1,39 @@
-# Can analyze 'n' type FET only for now ///// ambipolar not yet
-#
-# Copyright (c) [20250306] [Yi, Dong-Joon]. All rights reserved.
+# Copyright (c) [20250319] [Yi, Dong-Joon]. All rights reserved.
 # iver.ydj@gmail.com
 # This code is free for personal use only.
 # Commercial use, distribution, or modification of this code is strictly prohibited without explicit permission from the copyright holder.
 #
 # DISCLAIMER:
 # This code is provided "AS IS", without warranty of any kind. The author is not liable for any damages or issues arising from its use.
+#
+if True:    ### Description ###
+    # =====================================================================================================
+    # Transfer Curve Analysis for FETs
+    #
+    # Key Calculations:
+    #
+    # 1. **Threshold Voltage (V_th)**
+    #    - Determines the voltage at which the device turns on.
+    #    - Three methods:
+    #      1) **Current-based (V_th_current)**: V_g at a specific I_d threshold.
+    #      2) **Interpolation-based (V_th_interpol)**: Linear regression in the linear region.
+    #      3) **Log-derivative (V_th_logderivative)**: Maximum d(log(I_d)) / dV_g.
+    #
+    # 2. **Subthreshold Swing (SS)**
+    #    - Measures how efficiently the transistor switches.
+    #    - `SS = 1000 / (d log(I_d) / dV_g) (mV/dec)`.
+    #
+    # 3. **Field-Effect Mobility (μ)**
+    #    - Determines charge carrier transport efficiency.
+    #    - **Linear region:** `μ_linear = (L / (W * C_ox * V_d)) * g_m`
+    #    - **Effective mobility:** `μ_eff = (L / (W * C_ox * V_d)) * (I_d / |V_g - V_th|)`
+    #    - **Saturation mobility:** `μ_sat = (L / (W * C_ox * V_d)) * (2 * I_d / (V_g - V_th)^2)`
+    #    - For **p-type FETs**, calculations use `|V_g - V_th|` where needed.
+    #
+    # 4. **On/Off Ratio**
+    #    - `On/Off Ratio = max(I_d) / min(I_d)`, indicates switching performance.
+    # =====================================================================================================
+    pass
 
 import xlrd
 import pandas as pd
@@ -24,7 +51,7 @@ from datetime import datetime
 if True:
     now = datetime.now().strftime("%H-%M-%S_%Y%m%d")
     current_filename = os.path.basename(__file__)
-    directory = f'./result/TransferCurve/{current_filename}_{now}/'
+    directory = f'./result/TransferCurve/{now}_{current_filename}/'
     print('directory:',directory)
     os.makedirs(directory, exist_ok=True)
     with open(__file__, 'r', encoding="utf-8") as src, open(f'{directory}wholecode.py', 'w', encoding="utf-8") as dst:
@@ -37,27 +64,26 @@ if False:
 ##################################################################################                                          #
 ###########################      user input start     ############################                                          #
                                                                                                                             #
-device_type = 'p'       # 'n' & 'p' type only / amb not yet #FIXME                                                          #
+device_type = 'n'       # 'n' & 'p' type only / amb not yet #FIXME                                                          #
                                                                                                                             #
-data_file = 'TC_example-p.xls'                                                                                                      #
+data_file = 'EBL_s101_TR.xls'                                                                                               #
                                                                                                                             #
 ConditionData = False                                                                                                       #
 if ConditionData:                                                                                                           #
     condition_file = 'Conditions.xls'                                                                                       #
 else:                                                                                                                       #
-                                                                                                                            #
     ch_width = 1    # Size of Channel (um)                                                                                  #
     ch_length = 1                                                                                                           #
-    gi_thick = 0.09     # Thickness of gate insulator (um)                                                                  # 
+    gi_thick = 0.09     # Thickness of gate insulator (um)                                                                  #
                                                                                                                             #
 gi_eps_r = 3.9       # Relative permitivity (3.9 for SiO2)                                                                  #
                                                                                                                             #
 drain_current_at_vth = 1e-8 # A                                                                                             #
                                                                                                                             #
-linear_window_for_vth = 15  # V                                                                                             #   
+linear_window_for_vth = 15  # V                                                                                             #
                                                                                                                             #
-TransferPlot = True  # plot transfer curve  (True or False)                                                                 #
-if TransferPlot:                                                                                                            #
+Plotting = True  # plot transfer curve  (True or False)                                                                     #
+if Plotting:                                                                                                                #
     ApplyAbsolute = True  # for absolute value of current                                                                   #
                                                                                                                             #
     mannual_plot = False  # for transfer curve plot (True or False)                                                         #
@@ -65,29 +91,24 @@ if TransferPlot:                                                                
         Vg_min = -20                                                                                                        #
         Vg_max = +20                                                                                                        #
         Id_min = 1e-12                                                                                                      #
-        Id_max = 1e-3                                                                                                       # 
+        Id_max = 1e-3                                                                                                       #
         figure_size_h = 8                                                                                                   #
         figure_size_v = 6                                                                                                   #
                                                                                                                             #
 AnalyzeVth = True  # calculate Vth (True or False) with 3 methods (current, interpolation, log-derivative)                  #
-                                                                                                                            #
 AnalyzeSS = True  # calculate Subthreshold Swing (True or False)                                                            #
-                                                                                                                            #
 AnalyzeMobility = True  #  calculate field effect Mobility (True or False) with transconductance                            #
                                                                                                                             #
-                                                                                                                            #                 
-############################### specified control #################################                                         #
+############################### specified control (change only if you know what you are doing) ##############################
+if AnalyzeMobility:                                                                                                         #
+    Denoise_current = False  # NOT recommended # denoise I_d for calculating mobility (True or False)                       #
+    differential_roughness = 2 # (1~4) recommended                                                                          #
                                                                                                                             #
-if True:    ###### change only if you know what you are doing ######                                                        #
-    if AnalyzeMobility:                                                                                                     #
-        Denoise_current = False  # NOT recommended # denoise I_d for calculating mobility (True or False)                   #
-        differential_roughness = 2 # (1~4) recommended                                                                      #
+log_threshold_findSS = 1.4 # (1.1~2) recommended                                                                            #
                                                                                                                             #
-    log_threshold_findSS = 1.8 # (1.1~2) recommended                                                                        #
+RemoveOutliers = True                                                                                                       #
                                                                                                                             #
-    RemoveOutliers = True                                                                                                   #
-                                                                                                                            #
-###########################       user input end      ############################                                          #   
+###########################       user input end      ############################                                          #
 ##################################################################################                                          #
 #############################################################################################################################
 
@@ -181,34 +202,20 @@ if True:   ### pre-define functions for data analysis ###
         else:
             return 0
     
-    def split_by_trend(arr):
-        if len(arr) < 2:
-            return [arr]
-        trends = np.sign(np.diff(arr))
-        segments = []
-        start = 0
-        for i in range(1, len(trends)):
-            if trends[i] != trends[i - 1]:
-                segments.append(arr[start:i+1])
-                start = i
-        segments.append(arr[start:])
-        return segments
+    # def split_by_trend(arr):
+    #     if len(arr) < 2:
+    #         return [arr]
+    #     trends = np.sign(np.diff(arr))
+    #     segments = []
+    #     start = 0
+    #     for i in range(1, len(trends)):
+    #         if trends[i] != trends[i - 1]:
+    #             segments.append(arr[start:i+1])
+    #             start = i
+    #     segments.append(arr[start:])
+    #     return segments
     
-    def split_by_trend(arr):
-        if len(arr) < 2:
-            return [arr]
-        trends = np.sign(np.diff(arr))
-        segments = []
-        start = 0
-        for i in range(1, len(trends)):
-            if trends[i] != trends[i - 1]:
-                segments.append(arr[start:i+1])
-                start = i + 1
-        if start < len(arr):
-            segments.append(arr[start:])
-        return segments
-    
-    def get_segment_indices(arr, n=1):
+    def get_segment_indices(arr, n=0):
         if len(arr) < 2:
             return np.array([0]) if len(arr) > 0 else np.array([])
         trends = np.sign(np.diff(arr))
@@ -219,10 +226,17 @@ if True:   ### pre-define functions for data analysis ###
                 indices.append(np.arange(start, i+1))
                 start = i
         indices.append(np.arange(start, len(arr)))
-        if 1 <= n <= len(indices):
+        if n == 0:  # 가장 긴 세그먼트 자동 선택
+            max_index = max(indices, key=len)  # 길이가 가장 긴 세그먼트 선택
+            return max_index
+        elif 1 <= n <= len(indices):
             return indices[n - 1]
         else:
-            raise ValueError(f"n too big. (1 < n {len(indices)}")
+            raise ValueError(f"n too big. (1 <= n <= {len(indices)})")
+        # if 1 <= n <= len(indices):
+        #     return indices[n - 1]
+        # else:
+        #     raise ValueError(f"n too big. (1 < n {len(indices)}")
     
     def interpolate_large_gaps(data, step, donot_interpolate=False):
         data = np.array(data)
@@ -271,102 +285,6 @@ if True:   ### data analysis (calculate each single datasheet) ###
             CalculateSS = AnalyzeSS
             CalculateMobility = AnalyzeMobility
             
-            # def lowpass_window(data, window_size=15):
-            #     return np.convolve(data, np.ones(window_size) / window_size, mode='valid')
-            
-            # def check_monotonic(array):
-            #     differences = np.diff(array)
-            #     is_increasing = np.all(differences >= 0)
-            #     is_decreasing = np.all(differences <= 0)
-            #     if is_increasing:
-            #         return 1
-            #     elif is_decreasing:
-            #         return -1
-            #     else:
-            #         return 0
-            
-            # def split_by_trend(arr):
-            #     if len(arr) < 2:
-            #         return [arr]
-            #     trends = np.sign(np.diff(arr))
-            #     segments = []
-            #     start = 0
-            #     for i in range(1, len(trends)):
-            #         if trends[i] != trends[i - 1]:
-            #             segments.append(arr[start:i+1])
-            #             start = i
-            #     segments.append(arr[start:])
-            #     return segments
-            
-            
-            # def split_by_trend(arr):
-            #     if len(arr) < 2:
-            #         return [arr]
-            #     trends = np.sign(np.diff(arr))
-            #     segments = []
-            #     start = 0
-            #     for i in range(1, len(trends)):
-            #         if trends[i] != trends[i - 1]:
-            #             segments.append(arr[start:i+1])
-            #             start = i + 1
-            #     if start < len(arr):
-            #         segments.append(arr[start:])
-            #     return segments
-            
-            
-            # def get_segment_indices(arr, n=1):
-            #     if len(arr) < 2:
-            #         return np.array([0]) if len(arr) > 0 else np.array([])
-            #     trends = np.sign(np.diff(arr))
-            #     indices = []
-            #     start = 0
-            #     for i in range(1, len(trends)):
-            #         if trends[i] != trends[i - 1]:
-            #             indices.append(np.arange(start, i+1))
-            #             start = i
-            #     indices.append(np.arange(start, len(arr)))
-            #     if 1 <= n <= len(indices):
-            #         return indices[n - 1]
-            #     else:
-            #         raise ValueError(f"n too big. (1 < n {len(indices)}")
-            
-            # def interpolate_large_gaps(data, step, donot_interpolate=False):
-            #     data = np.array(data)
-            #     if step <= 0:
-            #         donot_interpolate = True
-            #     if donot_interpolate:
-            #         return data.tolist()
-            #     interpolated_data = [data[0]]
-            #     for i in range(1, len(data)):
-            #         gap = data[i] - interpolated_data[-1]
-            #         if gap > step:
-            #             num_elements = int(np.ceil(gap / step)) - 1
-            #             interpolated_values = [
-            #                 interpolated_data[-1] + step * j
-            #                 for j in range(1, num_elements + 1)
-            #             ]
-            #             interpolated_data.extend(interpolated_values)
-            #         interpolated_data.append(data[i])
-            #     return np.array(interpolated_data)
-            
-            # def find_nonzero_region(indices):
-            #     _start = indices[0]
-            #     _end = indices[0]
-            #     current_start = indices[0]
-            #     max_length = 0
-            #     for i in range(1, len(indices)):
-            #         if indices[i] != indices[i-1] + 1:
-            #             current_length = indices[i-1] - current_start + 1
-            #             if current_length > max_length:
-            #                 max_length = current_length
-            #                 _start = current_start
-            #                 _end = indices[i-1]
-            #             current_start = indices[i]
-            #     current_length = indices[-1] - current_start + 1
-            #     if current_length > max_length:
-            #         _start = current_start
-            #         _end = indices[-1]
-            #     return _start, _end
             ###################################
             if ConditionData:
                 ch_width = float(condition_list[i][0])
@@ -377,7 +295,7 @@ if True:   ### data analysis (calculate each single datasheet) ###
             else:
                 gi_thick_cm = gi_thick *1e-4  # cm
             gi_cap = gi_eps /gi_thick_cm #F/cm^2
-            print('eps_0:',eps_0,'\ngi_eps:',gi_eps,'\ngi_thick:',gi_thick)
+            # print('eps_0:',eps_0,'\ngi_eps:',gi_eps,'\ngi_thick:',gi_thick)
             
             name = data_names[i]
             setting = settings_list[i]
@@ -401,15 +319,15 @@ if True:   ### data analysis (calculate each single datasheet) ###
             else:
                 print('Not a single sweep')
                 if CalculateVth == True or CalculateSS == True or CalculateMobility == True:
-                    seg_num = 1
+                    seg_num = 2
                     idx_anl = get_segment_indices(V_g, seg_num)  
                     I_d = I_d[idx_anl]
                     I_g = I_g[idx_anl]
                     V_g = V_g[idx_anl]
+                    error_files_list.append(name+' (not a single sweep)')
                 else:
                     CalculateVth, CalculateSS, CalculateMobility = False, False, False
-                    error_files_list.append(name+' (not a single sweep)')
-            print('CalculateVth:',CalculateVth,'CalculateSS:',CalculateSS,'CalculateMobility:',CalculateMobility)
+            print('CalculateVth:',CalculateVth,'\nCalculateSS:',CalculateSS,'\nCalculateMobility:',CalculateMobility)
             
             if (len(I_d) != len(I_g) or len(I_d) != len(V_g)) or (len(I_d) == 0 or len(I_g) == 0 or len(V_g) == 0):
                 error_files_list.append(name)
@@ -436,7 +354,7 @@ if True:   ### data analysis (calculate each single datasheet) ###
                 continue
             
             ##########################################
-            if TransferPlot:
+            if Plotting:
                 plt.figure(figsize=(figure_size_h if mannual_plot else 10, figure_size_v if mannual_plot else 6))
                 ax1 = plt.gca() 
                 ax2 = ax1.twinx()
@@ -461,7 +379,12 @@ if True:   ### data analysis (calculate each single datasheet) ###
                     ax2.set_ylim(Id_min, Id_max)
                 else:
                     ax1.set_xlim(V_g.min(), V_g.max())
-                    ax1.set_ylim(min(I_d.min(), I_g.min())*1e-1, max(I_d.max(), I_g.max())*1e+1)
+                    ymin = min(I_d.min(), I_g.min()) * 1e-1
+                    ymax = max(I_d.max(), I_g.max()) * 1e+1
+                    if ymin <= 0:
+                        ymin = 1e-12
+                    ax1.set_ylim(ymin, ymax)
+                    # ax1.set_ylim(min(I_d.min(), I_g.min())*1e-1, max(I_d.max(), I_g.max())*1e+1)
                     ax2.set_ylim(I_d.min(), I_d.max())
                 plt.title("Transfer Curve: {}".format(name))
                 plt.savefig(directory + "TransferCurve_{}.png".format(name))
@@ -492,8 +415,10 @@ if True:   ### data analysis (calculate each single datasheet) ###
                 
                 if device_type == 'n':
                     d_log_I_d_dV_g_fine = np.gradient(log_I_d_fine, V_g_fine)
+                    d_log_I_d_dV_g_fine = np.where(d_log_I_d_dV_g_fine > 0, d_log_I_d_dV_g_fine, 1e-12)
                 elif device_type == 'p':
                     d_log_I_d_dV_g_fine = np.gradient(log_I_d_fine, V_g_fine)*-1
+                    d_log_I_d_dV_g_fine = np.where(d_log_I_d_dV_g_fine > 0, d_log_I_d_dV_g_fine, 1e-12)
                 
                 if device_type == 'n':
                     subthreshold_indices = np.where(np.log10(d_log_I_d_dV_g_fine +1e-9) >= (log_threshold_findSS)*-1)[0]
@@ -677,13 +602,13 @@ if True:   ### data analysis (calculate each single datasheet) ###
                 axs[1, 0].set_xlabel("Gate Voltage ($V_g$) [V]")
                 axs[1, 0].set_ylabel(r"d($\log_{10}(I_d)$)/d$V_g$")
                 axs[1, 0].axvspan(V_g_fine[ss_start], V_g_fine[ss_end], color='yellow', alpha=0.3, label=r'ss region')
-                axs[1, 0].set_title("$\log_{10}(I_d)$ vs ($V_g$)")
+                axs[1, 0].set_title(r"$\log_{10}(I_d)$ vs ($V_g$)")
                 axs[1, 0].legend()
                 axs[1, 0].grid(True)
                 # axs[1, 1].plot(V_g_fine_cut, d_log_I_d_dV_g_cut, label=r'$\log_{10}(I_d)$', color='purple')
                 # axs[1, 1].set_xlabel("Gate Voltage ($V_g$) [V]")
                 # axs[1, 1].set_ylabel(r"$\log_{10}(I_d)$")
-                # axs[1, 1].set_title("$\log_{10}(I_d)$ vs ($V_g$) Cut")
+                # axs[1, 1].set_title(r"$\log_{10}(I_d)$ vs ($V_g$) Cut")
                 # axs[1, 1].legend()
                 # axs[1, 1].grid(True)
                 axs[1, 1].plot(V_g_fine_cut, SS_values_cut, label='SS', color='blue')
@@ -718,7 +643,7 @@ if True:   ### data analysis (calculate each single datasheet) ###
                 
                 axs[2, 0].plot(V_g_rough, mu_linear, label='Linear Region Mobility', marker='o',color='blue')
                 axs[2, 0].set_xlabel("Gate Voltage ($V_g$) [V]")
-                axs[2, 0].set_ylabel("Mobility ($\mu$) [cm^2/V·s]")
+                axs[2, 0].set_ylabel(r"Mobility ($\mu$) [cm^2/V·s]")
                 axs[2, 0].set_title("Linear Mobility vs Gate Voltage")
                 axs[2, 0].legend()
                 axs[2, 0].grid(True)
@@ -728,7 +653,7 @@ if True:   ### data analysis (calculate each single datasheet) ###
                 elif device_type == 'p':
                     axs[2, 1].plot(V_g_rough[:idx_sat_reigion], mu_eff[:idx_sat_reigion], label='Effective Mobility', marker='o',color='green')
                 axs[2, 1].set_xlabel("Gate Voltage ($V_g$) [V]")
-                axs[2, 1].set_ylabel("Mobility ($\mu$) [cm^2/V·s]")
+                axs[2, 1].set_ylabel(r"Mobility ($\mu$) [cm^2/V·s]")
                 axs[2, 1].set_title("Effective Mobility vs Gate Voltage")
                 axs[2, 1].legend()
                 axs[2, 1].grid(True)
@@ -738,7 +663,7 @@ if True:   ### data analysis (calculate each single datasheet) ###
                 elif device_type == 'p':
                     axs[2, 2].plot(V_g_rough[:idx_sat_reigion], mu_sat[:idx_sat_reigion], label='Saturation Mobility', marker='o',color='red')
                 axs[2, 2].set_xlabel("Gate Voltage ($V_g$) [V]")
-                axs[2, 2].set_ylabel("Mobility ($\mu$) [cm^2/V·s]")
+                axs[2, 2].set_ylabel(r"Mobility ($\mu$) [cm^2/V·s]")
                 axs[2, 2].set_title("Saturation Mobility vs Gate Voltage")
                 axs[2, 2].legend()
                 axs[2, 2].grid(True)
@@ -758,7 +683,7 @@ if True:   ### data analysis (calculate each single datasheet) ###
             result_list.append([name, V_d, vth_current, vth_interpol, vth_logderivative, onoff_ratio, subthreshold_swing, max_mu_linear])
             np.savetxt(directory + 'results.csv', np.array(result_list), delimiter=',', fmt='%s')
             
-            if TransferPlot:
+            if Plotting:
                 _transfercurve = np.vstack((np.array([['V_g-TC', name]], dtype=str), np.round(np.array([V_g, I_d], dtype=float),6).T)).T
                 transfercurve_list.extend(_transfercurve)
                 TC_maxlength = max(len(arr) for arr in transfercurve_list)
@@ -777,11 +702,23 @@ if True:   ### data analysis (calculate each single datasheet) ###
                 mobilityFE_save = np.array([np.pad(arr, (0, MF_maxlength - len(arr)), 'constant') for arr in mobilityFE_list]).T
                 np.savetxt(directory + 'MobilityFE.csv', mobilityFE_save, delimiter=',', fmt='%s')
             
-            del V_g_rough, V_g_fine, I_d_fine, log_I_d_fine, d_log_I_d_dV_g_fine, subthreshold_indices, V_g_linear, I_d_linear, I_d_rough, g_m, mu_linear, mu_eff, mu_sat, spline_gm, diff, outliers, valid_indices, search_start, search_end, best_start, start, end, V_g_window, I_d_window, corr, max_corr, V_g_extrap, I_d_extrap, slope, intercept, threshold, max_mu_linear, idx_sat_reigion
+            def clear_variables():
+                for var in [
+                    "V_g_rough", "V_g_fine", "I_d_fine", "log_I_d_fine", "d_log_I_d_dV_g_fine",
+                    "subthreshold_indices", "V_g_linear", "I_d_linear", "I_d_rough", "g_m",
+                    "mu_linear", "mu_eff", "mu_sat", "spline_gm", "diff", "outliers",
+                    "valid_indices", "search_start", "search_end", "best_start", "start", "end",
+                    "V_g_window", "I_d_window", "corr", "max_corr", "V_g_extrap", "I_d_extrap",
+                    "slope", "intercept", "threshold", "max_mu_linear", "idx_sat_reigion"
+                ]:
+                    if var in locals():
+                        del locals()[var]
+            clear_variables()
+        
         except Exception as e:
             print('Process Error (Unknown):',e)
             traceback.print_exc()
             error_files_list.append(name)
-        
+    
     if len(error_files_list) > 0:
-        print('\n\n\n\n******\nerror occured in files:',error_files_list)
+        print('\n\n\n\n******\nsomething happened in files (you shall check error):',error_files_list)
