@@ -39,16 +39,17 @@ import xlrd
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+plt.rcParams['figure.dpi'] = 120
 import traceback
 from scipy import interpolate
 from scipy.ndimage import gaussian_filter1d
-plt.rcParams['figure.dpi'] = 120
 import scipy
 from scipy.stats import linregress
 from scipy.interpolate import UnivariateSpline
 import os
-from datetime import datetime
+
 if True:
+    from datetime import datetime
     now = datetime.now().strftime("%H-%M-%S_%Y%m%d")
     current_filename = os.path.basename(__file__)
     directory = f'./result/TransferCurve/{now}_{current_filename}/'
