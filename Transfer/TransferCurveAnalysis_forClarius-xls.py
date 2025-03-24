@@ -67,7 +67,7 @@ if False:
                                                                                                                             #
 device_type = 'n'       # 'n' & 'p' type only / amb not yet #FIXME                                                          #
                                                                                                                             #
-data_file = 'EBL_s101_TR.xls'                                                                                               #
+data_file = 'TC_example2.xls'                                                                                               #
                                                                                                                             #
 ConditionData = False                                                                                                       #
 if ConditionData:                                                                                                           #
@@ -685,7 +685,7 @@ if True:   ### data analysis (calculate each single datasheet) ###
             np.savetxt(directory + 'results.csv', np.array(result_list), delimiter=',', fmt='%s')
             
             if Plotting:
-                _transfercurve = np.vstack((np.array([['V_g-TC', name]], dtype=str), np.round(np.array([V_g, I_d], dtype=float),6).T)).T
+                _transfercurve = np.vstack((np.array([['V_g-TC', name]], dtype=str), np.array([V_g, I_d], dtype=float).T)).T
                 transfercurve_list.extend(_transfercurve)
                 TC_maxlength = max(len(arr) for arr in transfercurve_list)
                 transfercurve_save = np.array([np.pad(arr, (0, TC_maxlength - len(arr)), 'constant') for arr in transfercurve_list]).T
@@ -720,6 +720,44 @@ if True:   ### data analysis (calculate each single datasheet) ###
             print('Process Error (Unknown):',e)
             traceback.print_exc()
             error_files_list.append(name)
+    
+    if Plotting:
+        df = pd.read_csv(directory +'TransferCurve.csv', header=None, skiprows=1)
+        header_row = pd.read_csv(directory + 'TransferCurve.csv', header=None, nrows=1).values[0]
+        num_columns = df.shape[1]
+        plt.figure(figsize=(10, 6))
+        for i in range(0, num_columns, 2):
+            x = df.iloc[:, i]
+            y = df.iloc[:, i + 1]
+            label = str(header_row[i + 1])
+            plt.plot(x, y, label=label)
+        plt.xlabel('X-axis')
+        plt.ylabel('Y-axis')
+        plt.title('Overlayed Curves')
+        plt.legend()
+        plt.grid(True)
+        plt.savefig(directory +"Total_linear.png")
+        plt.cla()
+        plt.clf()
+        plt.close()
+        
+        plt.figure(figsize=(10, 6))
+        for i in range(0, num_columns, 2):
+            x = df.iloc[:, i]
+            y = np.abs(df.iloc[:, i + 1])
+            label = str(header_row[i + 1])
+            plt.plot(x, y, label=label)
+        plt.xlabel('X-axis')
+        plt.ylabel('Y-axis')
+        plt.yscale('log')
+        plt.ylim(1e-14, None)
+        plt.title('Overlayed Curves')
+        plt.legend()
+        plt.grid(True)
+        plt.savefig(directory +"Total_log.png")
+        plt.cla()
+        plt.clf()
+        plt.close()
     
     if len(error_files_list) > 0:
         print('\n\n\n\n******\nsomething happened in files (you shall check error):',error_files_list)
