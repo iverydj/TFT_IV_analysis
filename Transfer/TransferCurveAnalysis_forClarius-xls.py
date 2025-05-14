@@ -35,6 +35,8 @@ if True:    ### Description ###
     # =====================================================================================================
     pass
 
+import time
+start_time = time.time().strftime("%H-%M-%S_%Y%m%d")
 import xlrd
 import pandas as pd
 import numpy as np
@@ -48,17 +50,17 @@ from scipy.stats import linregress
 from scipy.interpolate import UnivariateSpline
 import os
 
+Debugging = False
+
 if True:
-    from datetime import datetime
-    now = datetime.now().strftime("%H-%M-%S_%Y%m%d")
-    current_filename = os.path.basename(__file__)
-    directory = f'./result/TransferCurve/{now}_{current_filename}/'
-    print('directory:',directory)
+    series_name = 'seriesA'
+    directory = './Debug' if Debugging else f'./result/TransferCurve/{series_name}_{start_time:%Y%m%d_%H%M%S}'
     os.makedirs(directory, exist_ok=True)
-    with open(__file__, 'r', encoding="utf-8") as src, open(f'{directory}wholecode.py', 'w', encoding="utf-8") as dst:
-        dst.write(src.read())
-if False:
-    directory = f'./test/'    # for debugging
+    if not Debugging:
+        backup_path = os.path.join(directory, 'code_backup.py')
+        with open(__file__, 'r', encoding='utf-8') as src, \
+            open(backup_path, 'w', encoding='utf-8') as dst:
+            dst.write(src.read())
 
 
 #############################################################################################################################
@@ -67,7 +69,7 @@ if False:
                                                                                                                             #
 device_type = 'n'       # 'n' & 'p' type only / amb not yet #FIXME                                                          #
                                                                                                                             #
-data_file = 'TC_example2.xls'                                                                                               #
+data_file = 's1_TR.xls'                                                                                               #
                                                                                                                             #
 ConditionData = False                                                                                                       #
 if ConditionData:                                                                                                           #
@@ -96,9 +98,9 @@ if Plotting:                                                                    
         figure_size_h = 8                                                                                                   #
         figure_size_v = 6                                                                                                   #
                                                                                                                             #
-AnalyzeVth = True  # calculate Vth (True or False) with 3 methods (current, interpolation, log-derivative)                  #
-AnalyzeSS = True  # calculate Subthreshold Swing (True or False)                                                            #
-AnalyzeMobility = True  #  calculate field effect Mobility (True or False) with transconductance                            #
+AnalyzeVth = False  # calculate Vth (True or False) with 3 methods (current, interpolation, log-derivative)                  #
+AnalyzeSS = False  # calculate Subthreshold Swing (True or False)                                                            #
+AnalyzeMobility = False  #  calculate field effect Mobility (True or False) with transconductance                            #
                                                                                                                             #
 ############################### specified control (change only if you know what you are doing) ##############################
 if AnalyzeMobility:                                                                                                         #
@@ -387,8 +389,8 @@ if True:   ### data analysis (calculate each single datasheet) ###
                     ax1.set_ylim(ymin, ymax)
                     # ax1.set_ylim(min(I_d.min(), I_g.min())*1e-1, max(I_d.max(), I_g.max())*1e+1)
                     ax2.set_ylim(I_d.min(), I_d.max())
-                plt.title(f"TransferCurve_{name} V_d:{V_d}")
-                plt.savefig(directory + "TransferCurve_{}.png".format())
+                plt.title(f"TransferCurve_{name} V_d-{V_d}")
+                plt.savefig(directory + f"TR_{name}-V_d-{V_d}.png")
                 plt.cla()
                 plt.clf()
                 plt.close()
@@ -431,27 +433,28 @@ if True:   ### data analysis (calculate each single datasheet) ###
                     print('subthreshold_indices = 0\nenlarge - "log_threshold_findSS"')
                     continue
                 
-                # def plot_d_log_I_d(V_g_fine, d_log_I_d_dV_g_fine):        # for debugging & parameter tuning
-                #     plt.figure(figsize=(8, 5))
-                #     plt.plot(V_g_fine, d_log_I_d_dV_g_fine, marker='o', linestyle='-', color='b', label='d_log(I_d) / dV_g')
-                #     plt.xlabel('V_g_fine (V)', fontsize=12)
-                #     plt.ylabel('d log(I_d) / dV_g', fontsize=12)
-                #     plt.title('Subthreshold Slope (d log(I_d) / dV_g vs V_g)', fontsize=14)
-                #     plt.axhline(0, color='gray', linestyle='--', linewidth=0.8)
-                #     plt.grid(True, linestyle='--', alpha=0.7)
-                #     plt.legend()
-                #     plt.show()
-                #     plt.figure(figsize=(8, 5))
-                #     plt.plot(V_g_fine, np.log10(d_log_I_d_dV_g_fine +1e-9), marker='o', linestyle='-', color='r', label='d_log(I_d) / dV_g')
-                #     plt.axhline(log_threshold_findSS*-1, color='r', linestyle='--', linewidth=1.5, label=f'log_threshold_findSS = {(log_threshold_findSS*-1)}')
-                #     plt.xlabel('V_g_fine (V)', fontsize=12)
-                #     plt.ylabel('log--d log(I_d) / dV_g', fontsize=12)
-                #     plt.title('Subthreshold Slope (d log(I_d) / dV_g vs V_g)', fontsize=14)
-                #     plt.axhline(0, color='gray', linestyle='--', linewidth=0.8)
-                #     plt.grid(True, linestyle='--', alpha=0.7)
-                #     plt.legend()
-                #     plt.show()
-                # plot_d_log_I_d(V_g_fine, d_log_I_d_dV_g_fine)
+                if Debugging:
+                    def plot_d_log_I_d(V_g_fine, d_log_I_d_dV_g_fine):        # for debugging & parameter tuning
+                        plt.figure(figsize=(8, 5))
+                        plt.plot(V_g_fine, d_log_I_d_dV_g_fine, marker='o', linestyle='-', color='b', label='d_log(I_d) / dV_g')
+                        plt.xlabel('V_g_fine (V)', fontsize=12)
+                        plt.ylabel('d log(I_d) / dV_g', fontsize=12)
+                        plt.title('Subthreshold Slope (d log(I_d) / dV_g vs V_g)', fontsize=14)
+                        plt.axhline(0, color='gray', linestyle='--', linewidth=0.8)
+                        plt.grid(True, linestyle='--', alpha=0.7)
+                        plt.legend()
+                        plt.show()
+                        plt.figure(figsize=(8, 5))
+                        plt.plot(V_g_fine, np.log10(d_log_I_d_dV_g_fine +1e-9), marker='o', linestyle='-', color='r', label='d_log(I_d) / dV_g')
+                        plt.axhline(log_threshold_findSS*-1, color='r', linestyle='--', linewidth=1.5, label=f'log_threshold_findSS = {(log_threshold_findSS*-1)}')
+                        plt.xlabel('V_g_fine (V)', fontsize=12)
+                        plt.ylabel('log--d log(I_d) / dV_g', fontsize=12)
+                        plt.title('Subthreshold Slope (d log(I_d) / dV_g vs V_g)', fontsize=14)
+                        plt.axhline(0, color='gray', linestyle='--', linewidth=0.8)
+                        plt.grid(True, linestyle='--', alpha=0.7)
+                        plt.legend()
+                        plt.show()
+                    plot_d_log_I_d(V_g_fine, d_log_I_d_dV_g_fine)
                 
                 ss_start, ss_end = find_nonzero_region(subthreshold_indices)
                 
@@ -571,118 +574,119 @@ if True:   ### data analysis (calculate each single datasheet) ###
                 max_mu_linear = np.nan
             
             #############################################################################
-            fig, axs = plt.subplots(3, 3, figsize=(25, 12))
-            if CalculateVth:
-                axs[0, 0].plot(V_g, I_d, label='Drain Current ($I_d$)', color='blue')
-                axs[0, 0].plot(V_g_linear, I_d_linear, 'o', label='Linear Region', color='orange', alpha=0.3)
-                axs[0, 0].axvline(vth_interpol, color='green', linestyle='--', label=f'Threshold Voltage ($V_th$): {vth_interpol:.2f} V')
-                V_g_extrap = np.linspace(vth_interpol, V_g_linear.max(), 10)
-                I_d_extrap = slope * V_g_extrap + intercept
-                axs[0, 0].plot(V_g_extrap, I_d_extrap, color='red', linestyle='--', label='Extrapolated Line')
-                axs[0, 0].set_xlabel("Gate Voltage ($V_g$) [V]")
-                axs[0, 0].set_ylabel("Drain Current ($I_d$) [A]")
-                axs[0, 0].legend()
-                axs[0, 0].grid(True)
-                axs[0, 0].set_title("Transfer Curve: Linear Scale")
-                axs[0, 0].set_ylim(0, None)
-                axs[0, 1].plot(V_g, I_d, 'o', label='Original Drain Current ($I_d$)', color='cyan', alpha=0.5)
-                axs[0, 1].plot(V_g_fine, np.exp(log_I_d_fine), '-', label='Interpolated Drain Current', color='blue')
-                axs[0, 1].axvline(vth_logderivative, color='green', linestyle='--', label=f'Threshold Voltage ($V_th$): {vth_logderivative:.2f} V')
-                axs[0, 1].set_yscale('log')
-                axs[0, 1].set_xlabel("Gate Voltage ($V_g$) [V]")
-                axs[0, 1].set_ylabel("Drain Current ($I_d$) [A]")
-                axs[0, 1].legend()
-                axs[0, 1].grid(True)
-                axs[0, 1].set_title("Transfer Curve: Log Scale")
-            else:
-                axs[0, 0].axis('off')
-                axs[0, 1].axis('off')
-                
-            if CalculateSS:
-                axs[1, 0].plot(V_g_fine, d_log_I_d_dV_g_fine, label=r'd($\log_{10}(I_d)$)/d$V_g$', color='purple')
-                axs[1, 0].set_xlabel("Gate Voltage ($V_g$) [V]")
-                axs[1, 0].set_ylabel(r"d($\log_{10}(I_d)$)/d$V_g$")
-                axs[1, 0].axvspan(V_g_fine[ss_start], V_g_fine[ss_end], color='yellow', alpha=0.3, label=r'ss region')
-                axs[1, 0].set_title(r"$\log_{10}(I_d)$ vs ($V_g$)")
-                axs[1, 0].legend()
-                axs[1, 0].grid(True)
-                # axs[1, 1].plot(V_g_fine_cut, d_log_I_d_dV_g_cut, label=r'$\log_{10}(I_d)$', color='purple')
-                # axs[1, 1].set_xlabel("Gate Voltage ($V_g$) [V]")
-                # axs[1, 1].set_ylabel(r"$\log_{10}(I_d)$")
-                # axs[1, 1].set_title(r"$\log_{10}(I_d)$ vs ($V_g$) Cut")
-                # axs[1, 1].legend()
-                # axs[1, 1].grid(True)
-                axs[1, 1].plot(V_g_fine_cut, SS_values_cut, label='SS', color='blue')
-                axs[1, 1].set_xlabel("Gate Voltage ($V_g$) [V]")
-                axs[1, 1].set_ylabel("SS (mV/decade)")
-                axs[1, 1].set_title("SS vs ($V_g$)")
-                axs[1, 1].legend(loc='upper right')
-                axs[1, 1].grid(True)
-                
-            else:
-                axs[1, 0].axis('off')
-                axs[1, 1].axis('off')
-            
-            if CalculateMobility:
-                axs[0, 2].plot(V_g_rough, g_m, label='Transconductance ($g_m$)', marker='o', color='purple')
-                axs[0, 2].plot(V_g_rough, spline_gm(V_g_rough), '-', label='spline', color='green', alpha=0.5)
-                axs[0, 2].set_xlabel("Gate Voltage ($V_g$) [V]")
-                axs[0, 2].set_ylabel("Transconductance ($g_m$) [A/V]")
-                axs[0, 2].set_title("Transconductance vs Gate Voltage")
-                axs[0, 2].legend()
-                axs[0, 2].grid(True)
-                
-                if Denoise_current:
-                    axs[1, 2].plot(V_g_rough, I_d_rough, label='Linear Region Mobility', marker='o',color='blue')
-                    axs[1, 2].set_xlabel("Gate Voltage ($V_g$) [V]")
-                    axs[1, 2].set_ylabel("Drain Current ($I_d$) [A]")
-                    axs[1, 2].set_title("Smoothed I_d vs Gate Voltage")
-                    axs[1, 2].legend()
-                    axs[1, 2].grid(True)
+            if CalculateVth or CalculateSS or CalculateMobility:
+                fig, axs = plt.subplots(3, 3, figsize=(25, 12))
+                if CalculateVth:
+                    axs[0, 0].plot(V_g, I_d, label='Drain Current ($I_d$)', color='blue')
+                    axs[0, 0].plot(V_g_linear, I_d_linear, 'o', label='Linear Region', color='orange', alpha=0.3)
+                    axs[0, 0].axvline(vth_interpol, color='green', linestyle='--', label=f'Threshold Voltage ($V_th$): {vth_interpol:.2f} V')
+                    V_g_extrap = np.linspace(vth_interpol, V_g_linear.max(), 10)
+                    I_d_extrap = slope * V_g_extrap + intercept
+                    axs[0, 0].plot(V_g_extrap, I_d_extrap, color='red', linestyle='--', label='Extrapolated Line')
+                    axs[0, 0].set_xlabel("Gate Voltage ($V_g$) [V]")
+                    axs[0, 0].set_ylabel("Drain Current ($I_d$) [A]")
+                    axs[0, 0].legend()
+                    axs[0, 0].grid(True)
+                    axs[0, 0].set_title("Transfer Curve: Linear Scale")
+                    axs[0, 0].set_ylim(0, None)
+                    axs[0, 1].plot(V_g, I_d, 'o', label='Original Drain Current ($I_d$)', color='cyan', alpha=0.5)
+                    axs[0, 1].plot(V_g_fine, np.exp(log_I_d_fine), '-', label='Interpolated Drain Current', color='blue')
+                    axs[0, 1].axvline(vth_logderivative, color='green', linestyle='--', label=f'Threshold Voltage ($V_th$): {vth_logderivative:.2f} V')
+                    axs[0, 1].set_yscale('log')
+                    axs[0, 1].set_xlabel("Gate Voltage ($V_g$) [V]")
+                    axs[0, 1].set_ylabel("Drain Current ($I_d$) [A]")
+                    axs[0, 1].legend()
+                    axs[0, 1].grid(True)
+                    axs[0, 1].set_title("Transfer Curve: Log Scale")
                 else:
+                    axs[0, 0].axis('off')
+                    axs[0, 1].axis('off')
+                    
+                if CalculateSS:
+                    axs[1, 0].plot(V_g_fine, d_log_I_d_dV_g_fine, label=r'd($\log_{10}(I_d)$)/d$V_g$', color='purple')
+                    axs[1, 0].set_xlabel("Gate Voltage ($V_g$) [V]")
+                    axs[1, 0].set_ylabel(r"d($\log_{10}(I_d)$)/d$V_g$")
+                    axs[1, 0].axvspan(V_g_fine[ss_start], V_g_fine[ss_end], color='yellow', alpha=0.3, label=r'ss region')
+                    axs[1, 0].set_title(r"$\log_{10}(I_d)$ vs ($V_g$)")
+                    axs[1, 0].legend()
+                    axs[1, 0].grid(True)
+                    # axs[1, 1].plot(V_g_fine_cut, d_log_I_d_dV_g_cut, label=r'$\log_{10}(I_d)$', color='purple')
+                    # axs[1, 1].set_xlabel("Gate Voltage ($V_g$) [V]")
+                    # axs[1, 1].set_ylabel(r"$\log_{10}(I_d)$")
+                    # axs[1, 1].set_title(r"$\log_{10}(I_d)$ vs ($V_g$) Cut")
+                    # axs[1, 1].legend()
+                    # axs[1, 1].grid(True)
+                    axs[1, 1].plot(V_g_fine_cut, SS_values_cut, label='SS', color='blue')
+                    axs[1, 1].set_xlabel("Gate Voltage ($V_g$) [V]")
+                    axs[1, 1].set_ylabel("SS (mV/decade)")
+                    axs[1, 1].set_title("SS vs ($V_g$)")
+                    axs[1, 1].legend(loc='upper right')
+                    axs[1, 1].grid(True)
+                    
+                else:
+                    axs[1, 0].axis('off')
+                    axs[1, 1].axis('off')
+                
+                if CalculateMobility:
+                    axs[0, 2].plot(V_g_rough, g_m, label='Transconductance ($g_m$)', marker='o', color='purple')
+                    axs[0, 2].plot(V_g_rough, spline_gm(V_g_rough), '-', label='spline', color='green', alpha=0.5)
+                    axs[0, 2].set_xlabel("Gate Voltage ($V_g$) [V]")
+                    axs[0, 2].set_ylabel("Transconductance ($g_m$) [A/V]")
+                    axs[0, 2].set_title("Transconductance vs Gate Voltage")
+                    axs[0, 2].legend()
+                    axs[0, 2].grid(True)
+                    
+                    if Denoise_current:
+                        axs[1, 2].plot(V_g_rough, I_d_rough, label='Linear Region Mobility', marker='o',color='blue')
+                        axs[1, 2].set_xlabel("Gate Voltage ($V_g$) [V]")
+                        axs[1, 2].set_ylabel("Drain Current ($I_d$) [A]")
+                        axs[1, 2].set_title("Smoothed I_d vs Gate Voltage")
+                        axs[1, 2].legend()
+                        axs[1, 2].grid(True)
+                    else:
+                        axs[1, 2].axis('off')
+                    
+                    axs[2, 0].plot(V_g_rough, mu_linear, label='Linear Region Mobility', marker='o',color='blue')
+                    axs[2, 0].set_xlabel("Gate Voltage ($V_g$) [V]")
+                    axs[2, 0].set_ylabel(r"Mobility ($\mu$) [cm^2/V·s]")
+                    axs[2, 0].set_title("Linear Mobility vs Gate Voltage")
+                    axs[2, 0].legend()
+                    axs[2, 0].grid(True)
+                    
+                    if device_type == 'n':
+                        axs[2, 1].plot(V_g_rough[idx_sat_reigion:], mu_eff[idx_sat_reigion:], label='Effective Mobility', marker='o',color='green')
+                    elif device_type == 'p':
+                        axs[2, 1].plot(V_g_rough[:idx_sat_reigion], mu_eff[:idx_sat_reigion], label='Effective Mobility', marker='o',color='green')
+                    axs[2, 1].set_xlabel("Gate Voltage ($V_g$) [V]")
+                    axs[2, 1].set_ylabel(r"Mobility ($\mu$) [cm^2/V·s]")
+                    axs[2, 1].set_title("Effective Mobility vs Gate Voltage")
+                    axs[2, 1].legend()
+                    axs[2, 1].grid(True)
+                    
+                    if device_type == 'n':
+                        axs[2, 2].plot(V_g_rough[idx_sat_reigion:], mu_sat[idx_sat_reigion:], label='Saturation Mobility', marker='o',color='red')
+                    elif device_type == 'p':
+                        axs[2, 2].plot(V_g_rough[:idx_sat_reigion], mu_sat[:idx_sat_reigion], label='Saturation Mobility', marker='o',color='red')
+                    axs[2, 2].set_xlabel("Gate Voltage ($V_g$) [V]")
+                    axs[2, 2].set_ylabel(r"Mobility ($\mu$) [cm^2/V·s]")
+                    axs[2, 2].set_title("Saturation Mobility vs Gate Voltage")
+                    axs[2, 2].legend()
+                    axs[2, 2].grid(True)
+                    
+                else:
+                    axs[0, 2].axis('off')
+                    axs[2, 0].axis('off')
+                    axs[2, 1].axis('off')
+                    axs[2, 2].axis('off')
                     axs[1, 2].axis('off')
+                plt.tight_layout()
+                plt.savefig(directory +"Analysis_{}.png".format(name))
+                plt.cla()
+                plt.clf()
+                plt.close()
                 
-                axs[2, 0].plot(V_g_rough, mu_linear, label='Linear Region Mobility', marker='o',color='blue')
-                axs[2, 0].set_xlabel("Gate Voltage ($V_g$) [V]")
-                axs[2, 0].set_ylabel(r"Mobility ($\mu$) [cm^2/V·s]")
-                axs[2, 0].set_title("Linear Mobility vs Gate Voltage")
-                axs[2, 0].legend()
-                axs[2, 0].grid(True)
-                
-                if device_type == 'n':
-                    axs[2, 1].plot(V_g_rough[idx_sat_reigion:], mu_eff[idx_sat_reigion:], label='Effective Mobility', marker='o',color='green')
-                elif device_type == 'p':
-                    axs[2, 1].plot(V_g_rough[:idx_sat_reigion], mu_eff[:idx_sat_reigion], label='Effective Mobility', marker='o',color='green')
-                axs[2, 1].set_xlabel("Gate Voltage ($V_g$) [V]")
-                axs[2, 1].set_ylabel(r"Mobility ($\mu$) [cm^2/V·s]")
-                axs[2, 1].set_title("Effective Mobility vs Gate Voltage")
-                axs[2, 1].legend()
-                axs[2, 1].grid(True)
-                
-                if device_type == 'n':
-                    axs[2, 2].plot(V_g_rough[idx_sat_reigion:], mu_sat[idx_sat_reigion:], label='Saturation Mobility', marker='o',color='red')
-                elif device_type == 'p':
-                    axs[2, 2].plot(V_g_rough[:idx_sat_reigion], mu_sat[:idx_sat_reigion], label='Saturation Mobility', marker='o',color='red')
-                axs[2, 2].set_xlabel("Gate Voltage ($V_g$) [V]")
-                axs[2, 2].set_ylabel(r"Mobility ($\mu$) [cm^2/V·s]")
-                axs[2, 2].set_title("Saturation Mobility vs Gate Voltage")
-                axs[2, 2].legend()
-                axs[2, 2].grid(True)
-                
-            else:
-                axs[0, 2].axis('off')
-                axs[2, 0].axis('off')
-                axs[2, 1].axis('off')
-                axs[2, 2].axis('off')
-                axs[1, 2].axis('off')
-            plt.tight_layout()
-            plt.savefig(directory +"Analysis_{}.png".format(name))
-            plt.cla()
-            plt.clf()
-            plt.close()
-            
-            result_list.append([name, V_d, vth_current, vth_interpol, vth_logderivative, onoff_ratio, subthreshold_swing, max_mu_linear])
-            np.savetxt(directory + 'results.csv', np.array(result_list), delimiter=',', fmt='%s')
+                result_list.append([name, V_d, vth_current, vth_interpol, vth_logderivative, onoff_ratio, subthreshold_swing, max_mu_linear])
+                np.savetxt(directory + 'results.csv', np.array(result_list), delimiter=',', fmt='%s')
             
             if Plotting:
                 _transfercurve = np.vstack((np.array([['V_g-TC', name]], dtype=str), np.array([V_g, I_d], dtype=float).T)).T
