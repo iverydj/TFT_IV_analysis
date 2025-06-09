@@ -35,8 +35,8 @@ if True:    ### Description ###
     # =====================================================================================================
     pass
 
-import time
-start_time = time.time().strftime("%H-%M-%S_%Y%m%d")
+from datetime import datetime
+start_time = datetime.now().strftime("%H-%M-%S_%Y%m%d")
 import xlrd
 import pandas as pd
 import numpy as np
@@ -54,7 +54,7 @@ Debugging = False
 
 if True:
     series_name = 'seriesA'
-    directory = './Debug' if Debugging else f'./result/TransferCurve/{series_name}_{start_time:%Y%m%d_%H%M%S}'
+    directory = './Debug/' if Debugging else f'./result/TransferCurve/{series_name}_{start_time}/'
     os.makedirs(directory, exist_ok=True)
     if not Debugging:
         backup_path = os.path.join(directory, 'code_backup.py')
@@ -69,7 +69,7 @@ if True:
                                                                                                                             #
 device_type = 'n'       # 'n' & 'p' type only / amb not yet #FIXME                                                          #
                                                                                                                             #
-data_file = 's1_TR.xls'                                                                                               #
+data_file = 'TC_example1.xls'                                                                                               #
                                                                                                                             #
 ConditionData = False                                                                                                       #
 if ConditionData:                                                                                                           #
@@ -98,16 +98,16 @@ if Plotting:                                                                    
         figure_size_h = 8                                                                                                   #
         figure_size_v = 6                                                                                                   #
                                                                                                                             #
-AnalyzeVth = False  # calculate Vth (True or False) with 3 methods (current, interpolation, log-derivative)                  #
-AnalyzeSS = False  # calculate Subthreshold Swing (True or False)                                                            #
-AnalyzeMobility = False  #  calculate field effect Mobility (True or False) with transconductance                            #
+AnalyzeVth = True  # calculate Vth (True or False) with 3 methods (current, interpolation, log-derivative)                  #
+AnalyzeSS = True  # calculate Subthreshold Swing (True or False)                                                            #
+AnalyzeMobility = True  #  calculate field effect Mobility (True or False) with transconductance                            #
                                                                                                                             #
 ############################### specified control (change only if you know what you are doing) ##############################
 if AnalyzeMobility:                                                                                                         #
     Denoise_current = False  # NOT recommended # denoise I_d for calculating mobility (True or False)                       #
     differential_roughness = 2 # (1~4) recommended                                                                          #
                                                                                                                             #
-log_threshold_findSS = 1.4 # (1.1~2) recommended                                                                            #
+log_threshold_findSS = 1.45 # (1.1~2) recommended                                                                            #
                                                                                                                             #
 RemoveOutliers = True                                                                                                       #
                                                                                                                             #
@@ -218,7 +218,7 @@ if True:   ### pre-define functions for data analysis ###
     #     segments.append(arr[start:])
     #     return segments
     
-    def get_segment_indices(arr, n=0):
+    def get_segment_indices(arr, n=-1):
         if len(arr) < 2:
             return np.array([0]) if len(arr) > 0 else np.array([])
         trends = np.sign(np.diff(arr))
@@ -229,10 +229,10 @@ if True:   ### pre-define functions for data analysis ###
                 indices.append(np.arange(start, i+1))
                 start = i
         indices.append(np.arange(start, len(arr)))
-        if n == 0:  # 가장 긴 세그먼트 자동 선택
+        if n == -1:  # 가장 긴 세그먼트 자동 선택
             max_index = max(indices, key=len)  # 길이가 가장 긴 세그먼트 선택
             return max_index
-        elif 1 <= n <= len(indices):
+        elif 0 <= n <= len(indices):
             return indices[n - 1]
         else:
             raise ValueError(f"n too big. (1 <= n <= {len(indices)})")
@@ -322,14 +322,15 @@ if True:   ### data analysis (calculate each single datasheet) ###
             else:
                 print('Not a single sweep')
                 if CalculateVth == True or CalculateSS == True or CalculateMobility == True:
-                    seg_num = 2
-                    idx_anl = get_segment_indices(V_g, seg_num)  
+                    seg_num = -1   # 0 means longest segment-1
+                    idx_anl = get_segment_indices(V_g, n=seg_num)  
                     I_d = I_d[idx_anl]
                     I_g = I_g[idx_anl]
                     V_g = V_g[idx_anl]
-                    error_files_list.append(name+' (not a single sweep)')
+                    print('Selected segment:', seg_num, f'with {len(I_d)} points')
+                    
                 else:
-                    CalculateVth, CalculateSS, CalculateMobility = False, False, False
+                    error_files_list.append(name+' (not a single sweep)')
             print('CalculateVth:',CalculateVth,'\nCalculateSS:',CalculateSS,'\nCalculateMobility:',CalculateMobility)
             
             if (len(I_d) != len(I_g) or len(I_d) != len(V_g)) or (len(I_d) == 0 or len(I_g) == 0 or len(V_g) == 0):
