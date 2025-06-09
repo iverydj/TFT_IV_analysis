@@ -69,7 +69,7 @@ if True:
                                                                                                                             #
 device_type = 'n'       # 'n' & 'p' type only / amb not yet #FIXME                                                          #
                                                                                                                             #
-data_file = 'TC_example1.xls'                                                                                               #
+data_file = '6_1_vd_pristine.xls'                                                                                               #
                                                                                                                             #
 ConditionData = False                                                                                                       #
 if ConditionData:                                                                                                           #
@@ -83,7 +83,7 @@ gi_eps_r = 3.9       # Relative permitivity (3.9 for SiO2)                      
                                                                                                                             #
 drain_current_at_vth = 1e-8 # A                                                                                             #
                                                                                                                             #
-linear_window_for_vth = 15  # V                                                                                             #
+linear_window_for_vth = 5  # V                                                                                             #
                                                                                                                             #
 Plotting = True  # plot transfer curve  (True or False)                                                                     #
 if Plotting:                                                                                                                #
@@ -107,7 +107,7 @@ if AnalyzeMobility:                                                             
     Denoise_current = False  # NOT recommended # denoise I_d for calculating mobility (True or False)                       #
     differential_roughness = 2 # (1~4) recommended                                                                          #
                                                                                                                             #
-log_threshold_findSS = 1.45 # (1.1~2) recommended                                                                            #
+log_threshold_findSS = 1.2 # (1.1~2) recommended                                                                            #
                                                                                                                             #
 RemoveOutliers = True                                                                                                       #
                                                                                                                             #
@@ -217,29 +217,39 @@ if True:   ### pre-define functions for data analysis ###
     #             start = i
     #     segments.append(arr[start:])
     #     return segments
-    
+
     def get_segment_indices(arr, n=-1):
         if len(arr) < 2:
             return np.array([0]) if len(arr) > 0 else np.array([])
+
         trends = np.sign(np.diff(arr))
         indices = []
         start = 0
-        for i in range(1, len(trends)):
-            if trends[i] != trends[i - 1]:
-                indices.append(np.arange(start, i+1))
+        i = 0
+
+        while i < len(trends):
+            # flat(0) 건너뛰기
+            if trends[i] == 0:
+                i += 1
                 start = i
-        indices.append(np.arange(start, len(arr)))
-        if n == -1:  # 가장 긴 세그먼트 자동 선택
-            max_index = max(indices, key=len)  # 길이가 가장 긴 세그먼트 선택
-            return max_index
-        elif 0 <= n <= len(indices):
-            return indices[n - 1]
+                continue
+            # 현재 방향 유지되는 동안 진행
+            direction = trends[i]
+            j = i + 1
+            while j < len(trends) and trends[j] == direction:
+                j += 1
+            end = j
+            indices.append(np.arange(start, end + 1))  # arr 인덱스 기준
+            i = j
+            start = j
+
+        if n == -1:
+            return max(indices, key=len) if indices else np.array([])
+        elif 0 <= n < len(indices):
+            return indices[n]
         else:
-            raise ValueError(f"n too big. (1 <= n <= {len(indices)})")
-        # if 1 <= n <= len(indices):
-        #     return indices[n - 1]
-        # else:
-        #     raise ValueError(f"n too big. (1 < n {len(indices)}")
+            raise ValueError(f"n too big. (0 <= n <= {len(indices)-1})")
+        
     
     def interpolate_large_gaps(data, step, donot_interpolate=False):
         data = np.array(data)
@@ -322,11 +332,17 @@ if True:   ### data analysis (calculate each single datasheet) ###
             else:
                 print('Not a single sweep')
                 if CalculateVth == True or CalculateSS == True or CalculateMobility == True:
-                    seg_num = -1   # 0 means longest segment-1
+                    seg_num = 1   # 0 means longest segment-1
                     idx_anl = get_segment_indices(V_g, n=seg_num)  
                     I_d = I_d[idx_anl]
                     I_g = I_g[idx_anl]
                     V_g = V_g[idx_anl]
+                    if check_monotonic(V_g) < 0:
+                        print('Negative single sweep segment')
+                        I_d = I_d[::-1]
+                        I_g = I_g[::-1]
+                        V_g = V_g[::-1]
+                    # print(V_g)
                     print('Selected segment:', seg_num, f'with {len(I_d)} points')
                     
                 else:
@@ -464,29 +480,87 @@ if True:   ### data analysis (calculate each single datasheet) ###
                 d_log_I_d_dV_g_cut = d_log_I_d_dV_g_fine[ss_start:ss_end]
                 print('\n------ *** -----\nV_d:', V_d)
             
-            if CalculateVth:
-                vth_current = np.round(np.interp(drain_current_at_vth, I_d, V_g, left=np.nan, right=np.nan),3)
+            # if CalculateVth:
+            #     vth_current = np.round(np.interp(drain_current_at_vth, I_d, V_g, left=np.nan, right=np.nan),3)
                 
-                window_size = int(linear_window_for_vth / (Vg_step_interpolate if Vg_step_interpolate>0 else (V_g_step if V_g_step else np.diff(V_g).min())))
-                # valid_indices = np.where((V_g_fine >= V_g_fine[ss_start]) & (V_g_fine <= V_g_fine[ss_end+ int(3/Vg_step_interpolate if Vg_step_interpolate>0 else (3/V_g_step if V_g_step else 0))]))[0]
-                # valid_indices = np.where((V_g_fine >= V_g_fine[ss_start]) & (V_g_fine <= V_g_fine[ss_end]))[0]
+            #     window_size = int(linear_window_for_vth / (Vg_step_interpolate if Vg_step_interpolate>0 else (V_g_step if V_g_step else np.diff(V_g).min())))
+            #     # valid_indices = np.where((V_g_fine >= V_g_fine[ss_start]) & (V_g_fine <= V_g_fine[ss_end+ int(3/Vg_step_interpolate if Vg_step_interpolate>0 else (3/V_g_step if V_g_step else 0))]))[0]
+            #     # valid_indices = np.where((V_g_fine >= V_g_fine[ss_start]) & (V_g_fine <= V_g_fine[ss_end]))[0]
+            #     if device_type == 'n':
+            #         #valid_indices = np.where((V_g_fine >= V_g_fine[ss_start]) 
+            #         #                         & (V_g_fine <= min(V_g_fine[-1], V_g_fine[ss_end] + 3 / (Vg_step_interpolate if Vg_step_interpolate > 0 else (V_g_step if V_g_step else 1)))))[0]
+            #         valid_indices = np.where((V_g_fine >= V_g_fine[ss_start]) 
+            #                                 & (V_g_fine <= V_g_fine[ss_end+ int(3/Vg_step_interpolate if Vg_step_interpolate>0 else (3/V_g_step if V_g_step else 0))]))[0]
+            #     elif device_type == 'p':
+            #         valid_indices = np.where((V_g_fine <= V_g_fine[ss_end])
+            #                                 & (V_g_fine >= V_g_fine[ss_start - int(3/Vg_step_interpolate if Vg_step_interpolate>0 else (3/V_g_step if V_g_step else 0))]))[0]
+            #     if len(valid_indices) == 0:
+            #         error_files_list.append(name+' (may be 1. too large "log_threshold_findSS" // 2. failed FET)')
+            #         print('may be 1. too large "log_threshold_findSS" // 2. failed FET')
+            #         continue
+            #     search_start, search_end = valid_indices[0], valid_indices[-1]# - window_size + 1
+            #     max_corr = 0
+            #     best_start = search_start
+            #     for start in range(search_start, search_end):
+            #         end = start + window_size
+            #         V_g_window = V_g_fine[start:end]
+            #         I_d_window = I_d_fine[start:end]
+            #         slope, intercept, r_value, _, _ = linregress(V_g_window, I_d_window)
+            #         corr = abs(r_value)
+            #         if corr > max_corr:
+            #             max_corr = corr
+            #             best_start = start
+            #     linear_region_mask = np.zeros_like(V_g_fine, dtype=bool)
+            #     linear_region_mask[best_start:best_start + window_size] = True
+            #     V_g_linear = V_g_fine[linear_region_mask]
+            #     I_d_linear = I_d_fine[linear_region_mask]
+                
+            #     slope, intercept, _, _, _ = linregress(V_g_linear, I_d_linear)
+            #     vth_interpol = np.round(-intercept / slope,3)
+                
+            #     max_slope_index_fine = np.argmax(d_log_I_d_dV_g_cut)
+            #     vth_logderivative = np.round(V_g_fine_cut[max_slope_index_fine],3)
+                
+            #     onoff_ratio = np.max(np.abs(I_d_fine)) / np.min(np.abs(I_d_fine))
+                
+            #     print('\nvth_current(at {}A): {} V\nvth_interpol: {} V\nvth_logderivative: {} V\nonoff_ratio {}'.format(drain_current_at_vth, vth_current, vth_interpol, vth_logderivative, onoff_ratio))
+            # else:
+            #     vth_current = np.nan
+            #     vth_interpol = np.nan
+            #     vth_logderivative = np.nan
+            #     onoff_ratio = np.nan
+            if CalculateVth:
+                vth_current = np.round(np.interp(drain_current_at_vth, I_d, V_g, left=np.nan, right=np.nan), 3)
+
+                step_base = Vg_step_interpolate if Vg_step_interpolate > 0 else (V_g_step if V_g_step else np.diff(V_g).min())
+                window_size = int(linear_window_for_vth / step_base)
+
+                offset = int(3 / step_base)
                 if device_type == 'n':
-                    #valid_indices = np.where((V_g_fine >= V_g_fine[ss_start]) 
-                    #                         & (V_g_fine <= min(V_g_fine[-1], V_g_fine[ss_end] + 3 / (Vg_step_interpolate if Vg_step_interpolate > 0 else (V_g_step if V_g_step else 1)))))[0]
-                    valid_indices = np.where((V_g_fine >= V_g_fine[ss_start]) 
-                                            & (V_g_fine <= V_g_fine[ss_end+ int(3/Vg_step_interpolate if Vg_step_interpolate>0 else (3/V_g_step if V_g_step else 0))]))[0]
+                    safe_end = min(ss_end + offset, len(V_g_fine) - 1)
+                    valid_indices = np.where(
+                        (V_g_fine >= V_g_fine[ss_start]) &
+                        (V_g_fine <= V_g_fine[safe_end])
+                    )[0]
                 elif device_type == 'p':
-                    valid_indices = np.where((V_g_fine <= V_g_fine[ss_end])
-                                            & (V_g_fine >= V_g_fine[ss_start - int(3/Vg_step_interpolate if Vg_step_interpolate>0 else (3/V_g_step if V_g_step else 0))]))[0]
+                    safe_start = max(ss_start - offset, 0)
+                    valid_indices = np.where(
+                        (V_g_fine <= V_g_fine[ss_end]) &
+                        (V_g_fine >= V_g_fine[safe_start])
+                    )[0]
+
                 if len(valid_indices) == 0:
-                    error_files_list.append(name+' (may be 1. too large "log_threshold_findSS" // 2. failed FET)')
+                    error_files_list.append(name + ' (may be 1. too large "log_threshold_findSS" // 2. failed FET)')
                     print('may be 1. too large "log_threshold_findSS" // 2. failed FET')
                     continue
-                search_start, search_end = valid_indices[0], valid_indices[-1]# - window_size + 1
+
+                search_start, search_end = valid_indices[0], valid_indices[-1]
                 max_corr = 0
                 best_start = search_start
                 for start in range(search_start, search_end):
                     end = start + window_size
+                    if end > len(V_g_fine):  # 범위 초과 방지
+                        break
                     V_g_window = V_g_fine[start:end]
                     I_d_window = I_d_fine[start:end]
                     slope, intercept, r_value, _, _ = linregress(V_g_window, I_d_window)
@@ -494,25 +568,30 @@ if True:   ### data analysis (calculate each single datasheet) ###
                     if corr > max_corr:
                         max_corr = corr
                         best_start = start
+
                 linear_region_mask = np.zeros_like(V_g_fine, dtype=bool)
                 linear_region_mask[best_start:best_start + window_size] = True
                 V_g_linear = V_g_fine[linear_region_mask]
                 I_d_linear = I_d_fine[linear_region_mask]
-                
+
                 slope, intercept, _, _, _ = linregress(V_g_linear, I_d_linear)
-                vth_interpol = np.round(-intercept / slope,3)
-                
+                vth_interpol = np.round(-intercept / slope, 3)
+
                 max_slope_index_fine = np.argmax(d_log_I_d_dV_g_cut)
-                vth_logderivative = np.round(V_g_fine_cut[max_slope_index_fine],3)
-                
+                vth_logderivative = np.round(V_g_fine_cut[max_slope_index_fine], 3)
+
                 onoff_ratio = np.max(np.abs(I_d_fine)) / np.min(np.abs(I_d_fine))
-                
-                print('\nvth_current(at {}A): {} V\nvth_interpol: {} V\nvth_logderivative: {} V\nonoff_ratio {}'.format(drain_current_at_vth, vth_current, vth_interpol, vth_logderivative, onoff_ratio))
+
+                print(f"\nvth_current(at {drain_current_at_vth}A): {vth_current} V")
+                print(f"vth_interpol: {vth_interpol} V")
+                print(f"vth_logderivative: {vth_logderivative} V")
+                print(f"onoff_ratio: {np.round(onoff_ratio)}")
             else:
                 vth_current = np.nan
                 vth_interpol = np.nan
                 vth_logderivative = np.nan
                 onoff_ratio = np.nan
+
             
             if CalculateSS:
                 SS_values = 1000 / d_log_I_d_dV_g_fine
@@ -556,16 +635,41 @@ if True:   ### data analysis (calculate each single datasheet) ###
                     I_d_rough = I_d_rough[~outliers]
                 
                 # print('ch_length:',ch_length,'\nch_width:',ch_width,'\ngi_cap:',gi_cap,'\nV_d:',V_d,'\nnp.max(g_m):',np.max(g_m))
+                # if device_type == 'n':
+                #     mu_linear = (ch_length /(ch_width *gi_cap *V_d)) *g_m    # Linear region mobility (cm^2/Vs) 
+                #     mu_eff = (ch_length/(ch_width *gi_cap *V_d))*(I_d_rough /(V_g_rough - vth_interpol))    # Effective mobility (cm^2/Vs)
+                #     mu_sat =  (ch_length/(ch_width *gi_cap *V_d))*(2*I_d_rough / (V_g_rough -vth_interpol)**2)    # Saturation mobility (cm^2/Vs)
+                #     idx_sat_reigion = np.where(V_g_rough > V_g_fine[ss_end])[0][0]
+                    
+                # elif device_type == 'p':
+                #     mu_linear = (ch_length /(ch_width *gi_cap *V_d)) *np.abs(g_m)    # Linear region mobility (cm^2/Vs)
+                #     mu_eff = (ch_length/(ch_width *gi_cap *V_d))*(I_d_rough /np.abs(V_g_rough - vth_interpol))    # Effective mobility (cm^2/Vs)
+                #     mu_sat =  (ch_length/(ch_width *gi_cap *V_d))*(2*I_d_rough / (V_g_rough -vth_interpol)**2)    # Saturation mobility (cm^2/Vs)
+                #     idx_sat_reigion = np.where(V_g_rough > V_g_fine[ss_start])[0][0]
                 if device_type == 'n':
-                    mu_linear = (ch_length /(ch_width *gi_cap *V_d)) *g_m    # Linear region mobility (cm^2/Vs) 
-                    mu_eff = (ch_length/(ch_width *gi_cap *V_d))*(I_d_rough /(V_g_rough - vth_interpol))    # Effective mobility (cm^2/Vs)
-                    mu_sat =  (ch_length/(ch_width *gi_cap *V_d))*(2*I_d_rough / (V_g_rough -vth_interpol)**2)    # Saturation mobility (cm^2/Vs)
-                    idx_sat_reigion = np.where(V_g_rough > V_g_fine[ss_end])[0][0]
+                    mu_linear = (ch_length / (ch_width * gi_cap * V_d)) * g_m
+                    mu_eff = (ch_length / (ch_width * gi_cap * V_d)) * (I_d_rough / (V_g_rough - vth_interpol))
+                    mu_sat = (ch_length / (ch_width * gi_cap * V_d)) * (2 * I_d_rough / (V_g_rough - vth_interpol) ** 2)
+
+                    cond_indices = np.where(V_g_rough > V_g_fine[ss_end])[0]
+                    if cond_indices.size == 0:
+                        print("[Mobility calc - n-type] No saturation region found (V_g_rough > V_g_fine[ss_end])")
+                        idx_sat_reigion = None
+                    else:
+                        idx_sat_reigion = cond_indices[0]
+
                 elif device_type == 'p':
-                    mu_linear = (ch_length /(ch_width *gi_cap *V_d)) *np.abs(g_m)    # Linear region mobility (cm^2/Vs)
-                    mu_eff = (ch_length/(ch_width *gi_cap *V_d))*(I_d_rough /np.abs(V_g_rough - vth_interpol))    # Effective mobility (cm^2/Vs)
-                    mu_sat =  (ch_length/(ch_width *gi_cap *V_d))*(2*I_d_rough / (V_g_rough -vth_interpol)**2)    # Saturation mobility (cm^2/Vs)
-                    idx_sat_reigion = np.where(V_g_rough > V_g_fine[ss_start])[0][0]
+                    mu_linear = (ch_length / (ch_width * gi_cap * V_d)) * np.abs(g_m)
+                    mu_eff = (ch_length / (ch_width * gi_cap * V_d)) * (I_d_rough / np.abs(V_g_rough - vth_interpol))
+                    mu_sat = (ch_length / (ch_width * gi_cap * V_d)) * (2 * I_d_rough / (V_g_rough - vth_interpol) ** 2)
+
+                    cond_indices = np.where(V_g_rough > V_g_fine[ss_start])[0]
+                    if cond_indices.size == 0:
+                        print("[Mobility calc - p-type] No saturation region found (V_g_rough > V_g_fine[ss_start])")
+                        idx_sat_reigion = None
+                    else:
+                        idx_sat_reigion = cond_indices[0]
+
                 
                 
                 max_mu_linear = np.max(mu_linear)
